@@ -17,29 +17,18 @@ path_silva = "data/kma_silva/"
 #Enter taxonomic level to plot
 tax_level = "Phylum"
 
-#This function takes a nested tibble and applies data cleaning procedures to each
-#tibble in the nested tibble. Assumes that the data in the nested_tibble is found in 
-#a column called "data"
 clean = function(nested_data) {
   nested_data <- nested_data %>% 
     mutate(data = map(data, ~ .x %>%                              #Take each tibble in data column and apply functions  
-                        rename("Template" = `#Template`) %>%                        #Change `#Template` column name
-                        separate_wider_delim("Template",                            #Separate Template into Taxonomy and Template
-                                             names = c("Template", "Taxonomy"),
+                        separate_wider_delim("refSequence",                            #Separate Template into Taxonomy and Template
+                                             names = c("refSequence", "Taxonomy"),
                                              delim = " ",
                                              too_many = "merge") %>% 
                         separate_wider_delim("Taxonomy",                            #Separate Taxonomy into each taxonomic group
                                              names =taxonomy,
                                              delim = ";",
                                              too_few = "align_start",
-                                             too_many = "merge") %>% 
-                        mutate(Template_Identity = as.numeric(Template_Identity),   #Make variables numeric for plotting
-                               Template_Coverage = as.numeric(Template_Coverage),
-                               Query_Identity = as.numeric(Query_Identity),
-                               Query_Coverage = as.numeric(Query_Coverage),
-                               Depth = as.numeric(Depth),
-                               q_value = as.numeric(q_value),
-                               Expected = as.numeric(Expected)) 
+                                             too_many = "merge") 
     )
     )
 }
@@ -74,7 +63,8 @@ load_mapstat = function(path) {
 resFinder_data_nested <- load_mapstat(path_resFinder)
 
 #Load Silva data
-silva_data_nested <- load_mapstat(path_silva)
+silva_data_nested <- load_mapstat(path_silva) %>% 
+  clean()
 
 #Unnest data
 resFinder_data_unnested <- resFinder_data_nested %>% 
@@ -83,4 +73,9 @@ resFinder_data_unnested <- resFinder_data_nested %>%
 silva_data_unnested <- silva_data_nested %>% 
   unnest()
 
+bp_total <- silva_data_unnested %>% 
+  group_by(sample) %>% 
+  filter(Domain == "Bacteria") %>% 
+  pull(bpTotal) %>% 
+  sum()
 
