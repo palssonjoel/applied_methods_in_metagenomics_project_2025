@@ -11,6 +11,7 @@
 library(tidyverse)
 library(tools)
 library(compositions)
+library(zCompositions)
 
 taxonomy = c(
   "Domain",
@@ -97,6 +98,7 @@ closure_table = function(unnested_data) {
     ungroup() %>%
     rename(`AR_Class` = geneClass,
            Sample = sample)
+  #use cmultRepl() if zeroes are in the data.
 }
 
 # 4. Data Loading
@@ -124,27 +126,46 @@ resFinder_data_nested <- resFinder_data_nested %>%
 resFinder_data_unnested <- resFinder_data_nested %>% 
   unnest()
 
-silva_data_unnested <- silva_data_nested %>% 
-  unnest()
-
 # ---- 5.3 Merge resFinder data with gene data, and get closures by AMR class ----
 
 #Merge resFinder data with resFinder gene data
 resFinder_data_unnested <- merge(resFinder_data_unnested,
                                  resFinder_genes)
-#Get closures
-closures = closure_table(resFinder_data_unnested)
+
+#Get closures. Wide data is necessary for alr() later
+closures = closure_table(resFinder_data_unnested) %>% 
+  pivot_wider(names_from = AR_Class,
+              values_from = classClosure)
+
+#ALR transformation
+ALR <- closures %>% 
+  column_to_rownames("Sample") %>%
+  acomp() %>%         # convert to compositional data object
+  alr() %>%           # apply Additive Log-Ratio transformation
+  as_tibble(rownames = "Sample")
+  
+CLR <- closures %>% 
+  column_to_rownames("Sample") %>%
+  acomp() %>%         # convert to compositional data object
+  clr() %>%           # apply Additive Log-Ratio transformation
+  as_tibble(rownames = "Sample")
+
 
 #Concept plot
 closures %>%
+  pivot_longer(
+    cols = -Sample,               # pivot all class columns except Sample
+    names_to = "AR_Class",        # new column for AMR class names
+    values_to = "classClosure"    # new column for closure values
+  ) %>% 
   ggplot(aes(x = Sample, y = classClosure, fill = AR_Class)) +
   geom_bar(stat = "identity") +
   theme_minimal() +
   labs(
     x = "Sample",
     y = "Class Closure Value",
-    fill = "AR Class",
-    title = "AR Class Distribution per Sample"
+    fill = "AMR Class",
+    title = "AMR Class Distribution per Sample"
   ) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
